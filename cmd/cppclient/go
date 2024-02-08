@@ -1,0 +1,3 @@
+#!/bin/sh
+meson compile -C build
+exec ./build/ffitest

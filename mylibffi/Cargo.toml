@@ -1,0 +1,13 @@
+[package]
+name = "mylibffi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = [ "cdylib" ]
+
+[dependencies]
+async-ffi = "0.5.0"
+async-trait = "0.1.77"
+chrono = "0.4.33"
+mylib = { path = "../mylib" }

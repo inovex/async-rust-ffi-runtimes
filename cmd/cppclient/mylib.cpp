@@ -12,7 +12,7 @@ struct FfiDataAccessVTable {
 extern "C" {
 
 ::FfiLib* mylib_alloc(void* data_access, ::FfiDataAccessVTable* data_access_vtable);
-::FfiFuture/* <bool> */ mylib_should_run(::FfiLib* mylib);
+::FfiFuture/* <bool> */ mylib_should_run(::FfiLib* mylib, std::uint32_t postcode);
 void mylib_free(::FfiLib* mylib);
 
 } // extern "C"
@@ -63,8 +63,8 @@ Lib::~Lib() {
     }
 }
 
-::FfiFuture Lib::should_run() {
-    return ::mylib_should_run(m_mylib);
+::FfiFuture Lib::should_run(std::uint32_t postcode) {
+    return ::mylib_should_run(m_mylib, postcode);
 }
 
 } // namespace mylib

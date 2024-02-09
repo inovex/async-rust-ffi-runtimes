@@ -31,7 +31,7 @@ fn main() {
     let lib = Lib::new(transport);
 
     if let Err(err) = smol::block_on(async {
-        let ok = lib.should_run(Utc::now()).await?;
+        let ok = lib.should_run(Postcode::new(76137)?, Utc::now()).await?;
         if ok {
             println!("ok");
         }

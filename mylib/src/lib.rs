@@ -18,13 +18,10 @@ pub trait DataAccess {
     async fn get_data(&self, key: &str) -> Result<Box<dyn DataHolder>, Box<dyn Error>>;
 }
 
-pub struct Lib<D: DataAccess> {
-    data_access: D,
-}
-
 #[derive(Debug)]
 pub enum MyError {
     InvalidData,
+    InvalidPostcode,
 }
 
 impl Error for MyError {}
@@ -40,6 +37,24 @@ struct CurrentState {
     state: i8,
 }
 
+pub struct Postcode {
+    code: u32,
+}
+
+impl Postcode {
+    pub fn new(code: u32) -> Result<Self, MyError> {
+        // TODO: probably a separate error type would be better?
+        if code > 99999 || code < 10000 {
+            return Err(MyError::InvalidPostcode);
+        }
+        Ok(Postcode { code })
+    }
+}
+
+pub struct Lib<D: DataAccess> {
+    data_access: D,
+}
+
 impl<D: DataAccess> Lib<D> {
     pub fn new(data_access: D) -> Lib<D> {
         Lib {
@@ -47,8 +62,8 @@ impl<D: DataAccess> Lib<D> {
         }
     }
 
-    pub async fn should_run(&self, _when: DateTime<Utc>) -> Result<bool, Box<dyn Error>> {
-        let k = format!("https://api.stromgedacht.de/v1/now?zip={}", 76137);
+    pub async fn should_run(&self, postcode: Postcode, _when: DateTime<Utc>) -> Result<bool, Box<dyn Error>> {
+        let k = format!("https://api.stromgedacht.de/v1/now?zip={}", postcode.code);
         let resp = self.data_access.get_data(&k).await?;
         let data = &resp.bytes();
         if data.len() == 0 {
@@ -87,7 +102,7 @@ mod test {
         let mut data_access = MockDataAccess::default();
         data_access.state = 1;
         let lib = Lib::new(data_access);
-        assert!(lib.should_run(Utc::now()).await?);
+        assert!(lib.should_run(Postcode::new(76137).unwrap(), Utc::now()).await?);
         Ok(())
     }
 }

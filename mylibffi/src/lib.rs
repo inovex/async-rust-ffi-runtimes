@@ -108,11 +108,13 @@ pub unsafe extern "C" fn mylib_alloc(data_access: *mut FfiDataAccess, data_acces
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mylib_should_run(ffi_lib: *mut FfiLib) -> FfiFuture<bool> {
+pub unsafe extern "C" fn mylib_should_run(ffi_lib: *mut FfiLib, postcode: u32) -> FfiFuture<bool> {
     eprintln!("mylib_should_run");
     let lib = &(*ffi_lib).instance;
+    // TODO: return proper error
+    let postcode = Postcode::new(postcode).unwrap();
     async {
-        match lib.should_run(Utc::now()).await {
+        match lib.should_run(postcode, Utc::now()).await {
             Ok(value)  => value,
             Err(e) => panic!("error from mylib: {}", e),
         }

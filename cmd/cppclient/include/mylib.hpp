@@ -58,7 +58,8 @@ public:
     Lib(std::unique_ptr<DataAccess> data_access);
     ~Lib();
 
-    ::FfiFuture should_run();
+    // postcode is checked by the library to keep the API surface smaller
+    ::FfiFuture should_run(std::uint32_t postcode);
 
 private:
     ::FfiLib *m_mylib;

@@ -26,8 +26,8 @@ class MockDataAccess : public mylib::DataAccess {
 public:
     ~MockDataAccess() override = default;
 
-    virtual ::FfiFuture/* <DataHolder> */ get_data() override {
-        return asyncrt::make_future([]() {
+    virtual ::FfiFuture<::FfiDataHolder*> get_data() override {
+        return asyncrt::make_future<::FfiDataHolder*>([]() {
                 auto *p = new StringDataHolder{R"({"state":1})"};
                 return static_cast<::FfiDataHolder*>(p);
             });
@@ -45,7 +45,9 @@ int main() {
 
         ioCtx.dispatch([&executor, &lib]() {
             auto future = lib.should_run(76137);
-            executor.await(std::move(future));
+            executor.await(std::move(future), [](bool const& result) {
+                    std::cout << "received " << result << " from mylib" << std::endl;
+                });
         });
 
         ioCtx.run();

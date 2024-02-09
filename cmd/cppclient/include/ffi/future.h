@@ -2,10 +2,6 @@
 
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct FfiWakerBase;
 
 struct FfiWakerVTable {
@@ -23,27 +19,25 @@ struct FfiContext {
     const struct FfiWakerBase *waker;
 };
 
-#ifdef __cplusplus
 enum class PollStatus : uint8_t {
-#else
-enum PollStatus {
-#endif
     Ready,
     Pending,
     Panicked,
 };
 
+template<typename T>
 struct FfiPoll {
-    enum PollStatus status;
-    void* value;
+    PollStatus status;
+    // the value is only present if the PollStatus is Ready,
+    // so wrap it in a union
+    union {
+        T value;
+    };
 };
 
+template<typename T>
 struct FfiFuture {
     void *fut_ptr;
-    struct FfiPoll (*poll_fn)(void *, struct FfiContext *);
+    struct FfiPoll<T> (*poll_fn)(void *, struct FfiContext *);
     void (*drop_fn)(void *);
 };
-
-#ifdef __cplusplus
-}
-#endif

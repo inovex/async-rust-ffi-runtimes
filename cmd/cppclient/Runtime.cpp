@@ -3,6 +3,7 @@
 #include <iostream>
 
 namespace asyncrt {
+namespace detail {
 
 FfiWakerVTable g_wakerImplVTable{
     &Waker::clone,
@@ -11,25 +12,12 @@ FfiWakerVTable g_wakerImplVTable{
     &Waker::drop,
 };
 
-Task::Task(::FfiFuture future, Executor& executor, uint64_t id)
-    : m_future{future}, m_waker{new Waker{executor, *this}}, m_id{id} {}
-
-Task::~Task() {
-    m_future.drop_fn(m_future.fut_ptr);
-}
-
-FfiPoll Task::poll() {
-    std::cout << "polling task " << m_id << std::endl;
-    FfiContext ctx{m_waker.get()};
-    return m_future.poll_fn(m_future.fut_ptr, &ctx);
-}
-
-Waker::Waker(Executor& executor, Task& task)
+Waker::Waker(Executor& executor, TaskBase& task)
     : FfiWakerBase{&g_wakerImplVTable},
       m_Executor{executor},
       m_task{task} {}
 
-FfiWakerBase const* Waker::Clone() const {
+FfiWakerBase const* Waker::clone_impl() const {
     std::cout << "WakerImpl::Clone() called" << std::endl;
     return new Waker(*this);
 }
@@ -49,51 +37,47 @@ void Waker::drop_impl() const {
     delete this;
 }
 
-Executor::Executor(boost::asio::io_context& ioCtx) : m_ioctx{ioCtx} {}
+TaskBase::TaskBase(Executor& executor, uint64_t id)
+    : m_id{id}
+    , m_waker{executor, *this}
+    , m_context{&m_waker} {}
 
-void Executor::await(::FfiFuture future) {
-    auto task = std::make_shared<Task>(std::move(future), *this, m_last_task_id++);
-    bool done = schedule(*task);
-    if (!done) {
-        m_tasks.emplace_back(std::move(task));
-    }
-}
+TaskBase::~TaskBase() = default;
 
-bool Executor::schedule(Task& task) {
-    std::cout << "scheduling task " << task.get_id() << std::endl;
-    auto poll = task.poll();
-    bool done = false;
-    std::cout << "poll=" << static_cast<int>(poll.status) << std::endl;
-    switch (poll.status) {
+bool TaskBase::poll(Executor& executor) {
+    std::cout << "scheduling task " << m_id << std::endl;
+    auto status = poll_impl(executor);
+    switch (status) {
     case PollStatus::Ready:
-        std::cout << "task " << task.get_id() << " finished" << std::endl;
-        done = true;
+        std::cout << "task " << m_id << " finished" << std::endl;
         break;
     case PollStatus::Pending:
-        std::cout << "task " << task.get_id() << " pending" << std::endl;
+        std::cout << "task " << m_id << " pending" << std::endl;
         break;
     case PollStatus::Panicked:
-        std::cout << "task " << task.get_id() << " panicked" << std::endl;
-        done = true;
+        std::cout << "task " << m_id << " panicked" << std::endl;
         break;
     }
-    return done;
+    return status != PollStatus::Pending;
 }
 
-void Executor::ready(Task& task) {
+} // namespace detail
+
+Executor::Executor(boost::asio::io_context& ioCtx) : m_ioctx{ioCtx} {}
+
+void Executor::ready(detail::TaskBase& task) {
     m_ioctx.dispatch([this, &task]() {
-        bool done = schedule(task);
+        bool done = task.poll(*this);
         if (done) {
             std::cout << "removing task " << task.get_id() << " from runtime" << std::endl;
-            auto taskId = task.get_id();
+            auto task_id = task.get_id();
             auto begin = std::begin(m_tasks);
             auto end = std::end(m_tasks);
-            auto iter = std::find_if(begin, end, [taskId](auto const& task) {
-                    return task->get_id() == taskId;
+            auto iter = std::find_if(begin, end, [task_id](auto const& task) {
+                    return task->get_id() == task_id;
                 });
             if (iter == end) {
-                std::cerr << "error: task " << taskId << " not known" <<
-                    std::endl;
+                std::cerr << "error: task " << task_id << " not known" << std::endl;
             }
             m_tasks.erase(iter);
         }

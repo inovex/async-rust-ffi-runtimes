@@ -50,7 +50,7 @@ class DataAccess {
 public:
     virtual ~DataAccess();
 
-    virtual ::FfiFuture/* <DataHolder> */ get_data() = 0;
+    virtual ::FfiFuture<::FfiDataHolder*> get_data() = 0;
 };
 
 class Lib {
@@ -59,7 +59,7 @@ public:
     ~Lib();
 
     // postcode is checked by the library to keep the API surface smaller
-    ::FfiFuture should_run(std::uint32_t postcode);
+    asyncrt::Future<bool> should_run(std::uint32_t postcode);
 
 private:
     ::FfiLib *m_mylib;

@@ -5,14 +5,14 @@
 namespace {
 
 struct FfiDataAccessVTable {
-    ::FfiFuture/* <FfiDataHolder*> */ (*get_data)(void*, char const*);
+    ::FfiFuture<FfiDataHolder*> (*get_data)(void*, char const*);
     void (*drop)(void*);
 };
 
 extern "C" {
 
 ::FfiLib* mylib_alloc(void* data_access, ::FfiDataAccessVTable* data_access_vtable);
-::FfiFuture/* <bool> */ mylib_should_run(::FfiLib* mylib, std::uint32_t postcode);
+::FfiFuture<bool> mylib_should_run(::FfiLib* mylib, std::uint32_t postcode);
 void mylib_free(::FfiLib* mylib);
 
 } // extern "C"
@@ -29,7 +29,7 @@ struct DataAccessWrapper {
         }
         , wrapped{std::move(data_access)} {}
 
-    static ::FfiFuture get_data(void* self, char const* key) {
+    static ::FfiFuture<::FfiDataHolder*> get_data(void* self, char const* key) {
         return static_cast<DataAccessWrapper*>(self)->wrapped->get_data();
     }
 
@@ -63,8 +63,9 @@ Lib::~Lib() {
     }
 }
 
-::FfiFuture Lib::should_run(std::uint32_t postcode) {
-    return ::mylib_should_run(m_mylib, postcode);
+asyncrt::Future<bool> Lib::should_run(std::uint32_t postcode) {
+    auto ffi_future = ::mylib_should_run(m_mylib, postcode);
+    return asyncrt::Future<bool>{std::move(ffi_future)};
 }
 
 } // namespace mylib

@@ -9,7 +9,6 @@ use std::{
 
 use async_ffi::{FfiFuture, FutureExt};
 use async_trait::async_trait;
-use chrono::Utc;
 
 use mylib::*;
 
@@ -114,7 +113,7 @@ pub unsafe extern "C" fn mylib_should_run(ffi_lib: *mut FfiLib, postcode: u32) -
     // TODO: return proper error
     let postcode = Postcode::new(postcode).unwrap();
     async {
-        match lib.should_run(postcode, Utc::now()).await {
+        match lib.should_run(postcode).await {
             Ok(value)  => value,
             Err(e) => panic!("error from mylib: {}", e),
         }

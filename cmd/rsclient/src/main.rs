@@ -1,7 +1,6 @@
 use std::error::Error;
 
 use async_trait::async_trait;
-use chrono::Utc;
 
 use mylib::*;
 
@@ -31,7 +30,7 @@ fn main() {
     let lib = Lib::new(transport);
 
     if let Err(err) = smol::block_on(async {
-        let ok = lib.should_run(Postcode::new(76137)?, Utc::now()).await?;
+        let ok = lib.should_run(Postcode::new(76137)?).await?;
         if ok {
             println!("ok");
         }

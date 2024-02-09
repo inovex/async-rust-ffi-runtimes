@@ -4,7 +4,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 // Trait to hold data without copying and being able to free it with the correct allocator.
@@ -62,7 +61,7 @@ impl<D: DataAccess> Lib<D> {
         }
     }
 
-    pub async fn should_run(&self, postcode: Postcode, _when: DateTime<Utc>) -> Result<bool, Box<dyn Error>> {
+    pub async fn should_run(&self, postcode: Postcode) -> Result<bool, Box<dyn Error>> {
         let k = format!("https://api.stromgedacht.de/v1/now?zip={}", postcode.code);
         let resp = self.data_access.get_data(&k).await?;
         let data = &resp.bytes();
@@ -102,7 +101,7 @@ mod test {
         let mut data_access = MockDataAccess::default();
         data_access.state = 1;
         let lib = Lib::new(data_access);
-        assert!(lib.should_run(Postcode::new(76137).unwrap(), Utc::now()).await?);
+        assert!(lib.should_run(Postcode::new(76137).unwrap()).await?);
         Ok(())
     }
 }

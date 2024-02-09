@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 async-io = "1.13.0"
 async-trait = "0.1.73"
-chrono = "0.4.33"
 mylib = { path = "../../mylib" }
 smol = "1.3.0"
 surf = "2.3.2"

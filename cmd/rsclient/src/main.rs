@@ -21,7 +21,7 @@ impl DataAccess for MyTransport {
     async fn get_data(&self, key: &str) -> Result<Box<dyn DataHolder>, Box<dyn Error>> {
         let mut res = surf::get(key).await?;
         let data = res.body_bytes().await?;
-        Ok(Box::new(MyDataHolder{data}))
+        Ok(Box::new(MyDataHolder { data }))
     }
 }
 

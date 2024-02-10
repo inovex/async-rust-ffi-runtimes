@@ -15,8 +15,8 @@ extern "C" {
 ::FfiFuture<bool> mylib_should_run(::FfiLib* mylib, std::uint32_t postcode);
 void mylib_free(::FfiLib* mylib);
 
-} // extern "C"
-} // namespace
+}  // extern "C"
+}  // namespace
 
 namespace mylib {
 namespace {
@@ -42,7 +42,7 @@ struct DataAccessWrapper {
     std::unique_ptr<DataAccess> wrapped;
 };
 
-} // namespace
+}  // namespace
 
 DataHolderBase::~DataHolderBase() = default;
 DataAccess::~DataAccess() = default;
@@ -68,4 +68,4 @@ asyncrt::Future<bool> Lib::should_run(std::uint32_t postcode) {
     return asyncrt::Future<bool>{std::move(ffi_future)};
 }
 
-} // namespace mylib
+}  // namespace mylib

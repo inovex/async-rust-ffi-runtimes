@@ -1,11 +1,8 @@
-use core::{
-    ffi::c_char,
-    slice,
-};
-use std::{
-    error::Error,
-    ffi::CString,
-};
+// Nearly everything is unsafe because of FFI
+#![allow(clippy::missing_safety_doc)]
+
+use core::{ffi::c_char, slice};
+use std::{error::Error, ffi::CString};
 
 use async_ffi::{FfiFuture, FutureExt};
 use async_trait::async_trait;
@@ -51,8 +48,9 @@ pub struct FfiDataAccess;
 #[repr(C)]
 pub struct FfiDataAccessVTable {
     /// The returned data is exclusively owned by the caller.
-    get_data: unsafe extern "C" fn(*mut FfiDataAccess, *const c_char) -> FfiFuture<*mut FfiDataHolder>,
-    drop: unsafe extern "C" fn(*mut FfiDataAccess)
+    get_data:
+        unsafe extern "C" fn(*mut FfiDataAccess, *const c_char) -> FfiFuture<*mut FfiDataHolder>,
+    drop: unsafe extern "C" fn(*mut FfiDataAccess),
 }
 
 struct DataAccessWrapper {
@@ -82,7 +80,7 @@ impl DataAccess for DataAccessWrapper {
         unsafe {
             let sp = pin.as_ptr();
             let data_holder = ((*(self.vtable)).get_data)(self.data, sp).await;
-            Ok(Box::new(DataWrapper{data_holder}))
+            Ok(Box::new(DataWrapper { data_holder }))
         }
     }
 }
@@ -93,7 +91,10 @@ pub struct FfiLib {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mylib_alloc(data_access: *mut FfiDataAccess, data_access_vtable: *const FfiDataAccessVTable) -> *mut FfiLib {
+pub unsafe extern "C" fn mylib_alloc(
+    data_access: *mut FfiDataAccess,
+    data_access_vtable: *const FfiDataAccessVTable,
+) -> *mut FfiLib {
     eprintln!("mylib_alloc");
     let data_access_wrapper = DataAccessWrapper {
         data: data_access,
@@ -101,7 +102,7 @@ pub unsafe extern "C" fn mylib_alloc(data_access: *mut FfiDataAccess, data_acces
     };
     let lib = Box::new(FfiLib {
         instance: Lib::new(data_access_wrapper),
-        _pin: core::marker::PhantomPinned{},
+        _pin: core::marker::PhantomPinned {},
     });
     Box::into_raw(lib)
 }
@@ -114,10 +115,11 @@ pub unsafe extern "C" fn mylib_should_run(ffi_lib: *mut FfiLib, postcode: u32) -
     let postcode = Postcode::new(postcode).unwrap();
     async {
         match lib.should_run(postcode).await {
-            Ok(value)  => value,
+            Ok(value) => value,
             Err(e) => panic!("error from mylib: {}", e),
         }
-    }.into_ffi()
+    }
+    .into_ffi()
 }
 
 #[no_mangle]

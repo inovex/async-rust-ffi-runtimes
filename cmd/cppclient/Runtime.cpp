@@ -13,9 +13,7 @@ FfiWakerVTable g_wakerImplVTable{
 };
 
 Waker::Waker(Executor& executor, TaskBase& task)
-    : FfiWakerBase{&g_wakerImplVTable},
-      m_Executor{executor},
-      m_task{task} {}
+    : FfiWakerBase{&g_wakerImplVTable}, m_Executor{executor}, m_task{task} {}
 
 FfiWakerBase const* Waker::clone_impl() const {
     std::cout << "WakerImpl::Clone() called" << std::endl;
@@ -38,9 +36,7 @@ void Waker::drop_impl() const {
 }
 
 TaskBase::TaskBase(Executor& executor, uint64_t id)
-    : m_id{id}
-    , m_waker{executor, *this}
-    , m_context{&m_waker} {}
+    : m_id{id}, m_waker{executor, *this}, m_context{&m_waker} {}
 
 TaskBase::~TaskBase() = default;
 
@@ -61,7 +57,7 @@ bool TaskBase::poll(Executor& executor) {
     return status != PollStatus::Pending;
 }
 
-} // namespace detail
+}  // namespace detail
 
 Executor::Executor(boost::asio::io_context& ioCtx) : m_ioctx{ioCtx} {}
 
@@ -73,9 +69,8 @@ void Executor::ready(detail::TaskBase& task) {
             auto task_id = task.get_id();
             auto begin = std::begin(m_tasks);
             auto end = std::end(m_tasks);
-            auto iter = std::find_if(begin, end, [task_id](auto const& task) {
-                    return task->get_id() == task_id;
-                });
+            auto iter = std::find_if(
+                begin, end, [task_id](auto const& task) { return task->get_id() == task_id; });
             if (iter == end) {
                 std::cerr << "error: task " << task_id << " not known" << std::endl;
             }
@@ -84,4 +79,4 @@ void Executor::ready(detail::TaskBase& task) {
     });
 }
 
-} // namespace asyncrt
+}  // namespace asyncrt

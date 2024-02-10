@@ -10,11 +10,10 @@
 class StringDataHolder : public mylib::DataHolderBase {
 public:
     StringDataHolder(std::string data)
-        : mylib::DataHolderBase{nullptr, 0}
-        , m_data{std::move(data)} {
-            ptr = reinterpret_cast<std::uint8_t const*>(m_data.c_str());
-            len = m_data.length();
-        }
+        : mylib::DataHolderBase{nullptr, 0}, m_data{std::move(data)} {
+        ptr = reinterpret_cast<std::uint8_t const*>(m_data.c_str());
+        len = m_data.length();
+    }
 
     ~StringDataHolder() override = default;
 
@@ -28,9 +27,9 @@ public:
 
     virtual ::FfiFuture<::FfiDataHolder*> get_data() override {
         return asyncrt::make_future<::FfiDataHolder*>([]() {
-                auto *p = new StringDataHolder{R"({"state":1})"};
-                return static_cast<::FfiDataHolder*>(p);
-            });
+            auto* p = new StringDataHolder{R"({"state":1})"};
+            return static_cast<::FfiDataHolder*>(p);
+        });
     }
 };
 
@@ -46,8 +45,8 @@ int main() {
         ioCtx.dispatch([&executor, &lib]() {
             auto future = lib.should_run(76137);
             executor.await(std::move(future), [](bool const& result) {
-                    std::cout << "received " << result << " from mylib" << std::endl;
-                });
+                std::cout << "received " << result << " from mylib" << std::endl;
+            });
         });
 
         ioCtx.run();

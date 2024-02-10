@@ -16,3 +16,24 @@ of an async Rust runtime in the target language.
   This was a constraint from the real project.
   Also, it precludes the need for circular references between the client,
   the library and the transport layer.
+
+## Building
+
+Running `make` should be sufficient, given all dependencies (see next
+section) are available.
+
+### Dependencies
+
+The `cppclient` demo uses the following system dependencies:
+
+- meson
+- Boost.Asio 1.74.0+
+
+On Ubuntu, install these dependencies:
+
+```
+build-essential clang-format clang-tidy libboost-dev meson
+```
+
+The rust code is checked with `clippy` and `rustfmt`, they can be
+installed via `rustup`.

@@ -1,12 +1,11 @@
 #pragma once
 
-#include "ffi/future.h"
-
 #include <boost/asio/io_context.hpp>
-
 #include <cstdint>
 #include <memory>
 #include <vector>
+
+#include "ffi/future.h"
 
 namespace asyncrt {
 
@@ -14,7 +13,7 @@ using PollStatus = ::PollStatus;
 
 /** This is just a more convenient wrapper around FfiFuture.
  */
-template<typename T>
+template <typename T>
 class Future {
 public:
     Future(::FfiFuture<T> f) : m_ffi_future{std::move(f)} {}
@@ -59,17 +58,13 @@ public:
         return static_cast<Waker const*>(self)->clone_impl();
     }
 
-    static void wake(::FfiWakerBase const* self) {
-        static_cast<Waker const*>(self)->wake_impl();
-    }
+    static void wake(::FfiWakerBase const* self) { static_cast<Waker const*>(self)->wake_impl(); }
 
     static void wake_by_ref(::FfiWakerBase const* self) {
         static_cast<Waker const*>(self)->wake_by_ref_impl();
     }
 
-    static void drop(::FfiWakerBase const* self) {
-        static_cast<Waker const*>(self)->drop_impl();
-    }
+    static void drop(::FfiWakerBase const* self) { static_cast<Waker const*>(self)->drop_impl(); }
 
 private:
     ::FfiWakerBase const* clone_impl() const;
@@ -91,13 +86,9 @@ protected:
 public:
     bool poll(Executor& executor);
 
-    uint64_t get_id() const noexcept {
-        return m_id;
-    }
+    uint64_t get_id() const noexcept { return m_id; }
 
-    ::FfiContext* get_context() noexcept {
-        return &m_context;
-    }
+    ::FfiContext* get_context() noexcept { return &m_context; }
 
 private:
     uint64_t m_id;
@@ -108,14 +99,11 @@ private:
 /**
  * Stores a future and its callback for later execution.
  */
-template<typename T, typename F>
+template <typename T, typename F>
 class Task : public detail::TaskBase {
 public:
     Task(Future<T> future, F&& callback, Executor& executor, uint64_t id)
-        : TaskBase{executor, id}
-        , m_future{std::move(future)}
-        , m_callback{std::move(callback)}
-        {}
+        : TaskBase{executor, id}, m_future{std::move(future)}, m_callback{std::move(callback)} {}
 
 protected:
     PollStatus poll_impl(Executor& executor) override {
@@ -131,15 +119,16 @@ private:
     F m_callback;
 };
 
-} // namespace detail
+}  // namespace detail
 
 class Executor {
 public:
     Executor(boost::asio::io_context& ioCtx);
 
-    template<typename T, typename F>
+    template <typename T, typename F>
     void await(Future<T> future, F&& callback) {
-        auto task = std::make_shared<detail::Task<T, F>>(std::move(future), std::forward<F>(callback), *this, m_last_task_id++);
+        auto task = std::make_shared<detail::Task<T, F>>(
+            std::move(future), std::forward<F>(callback), *this, m_last_task_id++);
         auto done = task->poll(*this);
         if (!done) {
             m_tasks.emplace_back(std::move(task));
@@ -157,7 +146,7 @@ private:
 
 namespace detail {
 
-template<typename T, typename F>
+template <typename T, typename F>
 class FutureImpl {
 public:
     FutureImpl(F&& f) : m_func{std::forward<F>(f)} {}
@@ -182,16 +171,16 @@ private:
     F m_func;
 };
 
-} // namespace detail
+}  // namespace detail
 
-template<typename T, typename F>
+template <typename T, typename F>
 ::FfiFuture<T> make_future(F&& f) {
     auto* future = new detail::FutureImpl<T, F>{std::forward<F>(f)};
-    return ::FfiFuture<T> {
+    return ::FfiFuture<T>{
         future,
         &detail::FutureImpl<T, F>::poll,
         &detail::FutureImpl<T, F>::drop,
     };
 }
 
-} // asyncrt
+}  // namespace asyncrt

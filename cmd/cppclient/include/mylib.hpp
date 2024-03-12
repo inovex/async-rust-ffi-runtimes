@@ -58,7 +58,7 @@ public:
     ~Lib();
 
     // postcode is checked by the library to keep the API surface smaller
-    asyncrt::Future<bool> should_run(std::uint32_t postcode);
+    asyncrt::RustFuture<bool> should_run(std::uint32_t postcode);
 
 private:
     ::FfiLib* m_mylib;

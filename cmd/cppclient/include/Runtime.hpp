@@ -1,37 +1,41 @@
 #pragma once
 
-#include <boost/asio/io_context.hpp>
+#include "Drop.hpp"
+#include "ffi/future.h"
+
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
-#include "ffi/future.h"
+#include <boost/asio/io_context.hpp>
+
+#include <iostream>
 
 namespace asyncrt {
 
 using PollStatus = ::PollStatus;
 
-/** This is just a more convenient wrapper around FfiFuture.
- */
+// A future which is passed from Rust to C++
 template <typename T>
-class Future {
+class RustFuture {
 public:
-    Future(::FfiFuture<T> f) : m_ffi_future{std::move(f)} {}
-    Future(Future const&) = delete;
+    RustFuture(::FfiFuture<T> f) : m_ffi_future{std::move(f)} {}
+    RustFuture(RustFuture const&) = delete;
 
-    Future(Future&& other) : m_ffi_future{other.m_ffi_future} {
+    RustFuture(RustFuture&& other) : m_ffi_future{other.m_ffi_future} {
         other.m_ffi_future.fut_ptr = nullptr;
     }
 
-    ~Future() {
+    ~RustFuture() {
         if (m_ffi_future.fut_ptr != nullptr) {
             m_ffi_future.drop_fn(m_ffi_future.fut_ptr);
         }
     }
 
-    Future& operator=(Future const&) = delete;
+    RustFuture& operator=(RustFuture const&) = delete;
 
-    Future& operator=(Future&& other) {
+    RustFuture& operator=(RustFuture&& other) {
         m_ffi_future.fut_ptr = other.m_ffi_future.fut_ptr;
         other.m_ffi_future.fut_ptr = nullptr;
     }
@@ -53,6 +57,10 @@ class TaskBase;
 class Waker : public ::FfiWakerBase {
 public:
     Waker(Executor& executor, TaskBase& task);
+    ~Waker();
+
+    Waker& operator=(Waker const&) = delete;
+    Waker& operator=(Waker&&) = delete;
 
     static ::FfiWakerBase const* clone(::FfiWakerBase const* self) {
         return static_cast<Waker const*>(self)->clone_impl();
@@ -67,6 +75,9 @@ public:
     static void drop(::FfiWakerBase const* self) { static_cast<Waker const*>(self)->drop_impl(); }
 
 private:
+    Waker(Waker const&) = default;
+    Waker(Waker&&) = default;
+
     ::FfiWakerBase const* clone_impl() const;
     void wake_impl() const;
     void wake_by_ref_impl() const;
@@ -84,7 +95,7 @@ protected:
     virtual PollStatus poll_impl(Executor& executor) = 0;
 
 public:
-    bool poll(Executor& executor);
+    [[nodiscard]] bool poll(Executor& executor);
 
     uint64_t get_id() const noexcept { return m_id; }
 
@@ -92,7 +103,7 @@ public:
 
 private:
     uint64_t m_id;
-    Waker m_waker;
+    DropPtr<Waker> m_waker;
     ::FfiContext m_context;
 };
 
@@ -102,11 +113,11 @@ private:
 template <typename T, typename F>
 class Task : public detail::TaskBase {
 public:
-    Task(Future<T> future, F&& callback, Executor& executor, uint64_t id)
+    Task(RustFuture<T> future, F&& callback, Executor& executor, uint64_t id)
         : TaskBase{executor, id}, m_future{std::move(future)}, m_callback{std::move(callback)} {}
 
 protected:
-    PollStatus poll_impl(Executor& executor) override {
+    [[nodiscard]] PollStatus poll_impl(Executor& executor) override {
         auto poll = m_future.poll(get_context());
         if (poll.status == PollStatus::Ready) {
             m_callback(poll.value);
@@ -115,7 +126,7 @@ protected:
     }
 
 private:
-    Future<T> m_future;
+    RustFuture<T> m_future;
     F m_callback;
 };
 
@@ -126,7 +137,7 @@ public:
     Executor(boost::asio::io_context& ioCtx);
 
     template <typename T, typename F>
-    void await(Future<T> future, F&& callback) {
+    void await(RustFuture<T> future, F&& callback) {
         auto task = std::make_shared<detail::Task<T, F>>(
             std::move(future), std::forward<F>(callback), *this, m_last_task_id++);
         auto done = task->poll(*this);
@@ -144,6 +155,24 @@ private:
     uint64_t m_last_task_id = 0;
 };
 
+template <typename T>
+::FfiPoll<T> make_poll_status(PollStatus poll_status) {
+    if (poll_status == PollStatus::Ready) {
+        throw std::invalid_argument{"poll status must not be ready without value"};
+    }
+    return ::FfiPoll<T>{
+        .status = poll_status,
+    };
+}
+
+template <typename T>
+::FfiPoll<T> make_poll_status(T&& value) {
+    return ::FfiPoll<T>{
+        .status = PollStatus::Ready,
+        .value = std::forward<T>(value),
+    };
+}
+
 namespace detail {
 
 template <typename T, typename F>
@@ -151,8 +180,13 @@ class FutureImpl {
 public:
     FutureImpl(F&& f) : m_func{std::forward<F>(f)} {}
 
-    static ::FfiPoll<T> poll(void* self, ::FfiContext* ctx) {
-        return static_cast<FutureImpl*>(self)->poll_impl(ctx);
+    static ::FfiPoll<T> poll(void* self, ::FfiContext* context) {
+        std::cout << "+++ [C] called  CppFuture " << self << " with context "
+                  << reinterpret_cast<void*>(context) << ", waker "
+                  << reinterpret_cast<void const*>(context->waker) << ", vtable "
+                  << reinterpret_cast<void const*>(context->waker->vtable) << ", wake func "
+                  << reinterpret_cast<void const*>(context->waker->vtable->wake) << std::endl;
+        return static_cast<FutureImpl*>(self)->poll_impl(context);
     }
 
     static void drop(void* self) {
@@ -161,11 +195,12 @@ public:
     }
 
 private:
-    ::FfiPoll<T> poll_impl(::FfiContext* /* ctx */) {
-        return ::FfiPoll<T>{
-            .status = ::PollStatus::Ready,
-            .value = m_func(),
-        };
+    ::FfiPoll<T> poll_impl(::FfiContext* ctx) {
+        try {
+            return m_func(ctx);
+        } catch (...) {
+            return make_poll_status<T>(PollStatus::Panicked);
+        }
     }
 
     F m_func;
@@ -174,8 +209,9 @@ private:
 }  // namespace detail
 
 template <typename T, typename F>
-::FfiFuture<T> make_future(F&& f) {
+::FfiFuture<T> make_cpp_future(F&& f) {
     auto* future = new detail::FutureImpl<T, F>{std::forward<F>(f)};
+    std::cout << "+++ [C] CPP FutureImpl    " << reinterpret_cast<void*>(future) << std::endl;
     return ::FfiFuture<T>{
         future,
         &detail::FutureImpl<T, F>::poll,

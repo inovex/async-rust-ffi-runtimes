@@ -1,5 +1,5 @@
+#include "AsyncFuture.hpp"
 #include "Runtime.hpp"
-
 #include "http.hpp"
 #include "mylib.hpp"
 
@@ -34,12 +34,45 @@ public:
     ~MockDataAccess() override = default;
 
     virtual ::FfiFuture<::FfiDataHolder*> get_data() override {
+        // This does not follow the Rust semantics of Future::poll(), the Boost.Asio semantics.
+        auto promise = asyncrt::Promise<std::string>{};
+        auto future = promise.get_future();
         // TODO: use the actual URL
         http::get(m_io_context, "api.stromgedacht.de", "/v1/now?zip=76137",
-                  [](std::string const& result) { std::cout << result << std::endl; });
-        return asyncrt::make_future<::FfiDataHolder*>([]() {
-            auto* p = new StringDataHolder{R"({"state":1})"};
-            return static_cast<::FfiDataHolder*>(p);
+                  [promise = std::move(promise)](std::string const& result) mutable {
+                      std::cout << "+++ [C] resolving promise: " << result << std::endl;
+                      promise.set_value(result);
+                  });
+        return asyncrt::make_cpp_future<::FfiDataHolder*>([future = std::move(future)](
+                                                              ::FfiContext* context) mutable {
+            std::cout << "+++ [C] cpp future callback             " << " with context "
+                      << reinterpret_cast<void*>(context) << ", waker "
+                      << reinterpret_cast<void const*>(context->waker) << ", vtable "
+                      << reinterpret_cast<void const*>(context->waker->vtable) << ", wake func "
+                      << reinterpret_cast<void const*>(context->waker->vtable->wake) << std::endl;
+            if (future.is_ready()) {
+                std::cout << "+++ [C] future is ready" << std::endl;
+                auto* p = new StringDataHolder{future.value()};
+                std::cout << "+++ [C] returning poll status READY" << std::endl;
+                return asyncrt::make_poll_status(static_cast<::FfiDataHolder*>(p));
+            }
+            // this is free'd by the call to wake()
+            auto const* waker = context->waker->vtable->clone(context->waker);
+            std::cout << "+++ [C] cloned waker " << reinterpret_cast<void const*>(context->waker)
+                      << " as " << reinterpret_cast<void const*>(waker) << std::endl;
+            future.await([waker]() {
+                // This will cause `future.poll_fn()` to be called again, this time the first
+                // branch will be taken.
+                std::cout << "+++ [C] cpp future await callback       " << " with waker "
+                          << reinterpret_cast<void const*>(waker) << ", vtable "
+                          << reinterpret_cast<void const*>(waker->vtable) << std::endl;
+                std::cout << "+++ [C] wake function "
+                          << reinterpret_cast<void const*>(waker->vtable->wake) << std::endl;
+                waker->vtable->wake(waker);
+                std::cout << "+++ [C] future done" << std::endl;
+            });
+            std::cout << "+++ [C] returning poll status PENDING" << std::endl;
+            return asyncrt::make_poll_status<::FfiDataHolder*>(asyncrt::PollStatus::Pending);
         });
     }
 

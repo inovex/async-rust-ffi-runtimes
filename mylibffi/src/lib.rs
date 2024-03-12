@@ -24,11 +24,11 @@ struct DataWrapper {
 
 impl DataHolder for DataWrapper {
     fn bytes(&self) -> &[u8] {
-        eprintln!("DataWrapper::byte");
+        eprintln!("+++ [R] DataWrapper::byte");
         unsafe {
             let ptr = (*(self.data_holder)).ptr;
             let len = (*(self.data_holder)).len;
-            eprintln!("DataWrapper::bytes: ptr={:?}, len={}", ptr, len);
+            eprintln!("+++ [R] DataWrapper::bytes: ptr={:?}, len={}", ptr, len);
             slice::from_raw_parts(ptr, len)
         }
     }
@@ -36,7 +36,7 @@ impl DataHolder for DataWrapper {
 
 impl Drop for DataWrapper {
     fn drop(&mut self) {
-        eprintln!("DataWrapper::drop");
+        eprintln!("+++ [R] DataWrapper::drop");
         unsafe {
             ((*(self.data_holder)).drop)(self.data_holder);
         }
@@ -63,7 +63,7 @@ unsafe impl Sync for DataAccessWrapper {}
 
 impl Drop for DataAccessWrapper {
     fn drop(&mut self) {
-        eprintln!("DataAccessWrapper::drop");
+        eprintln!("+++ [R] DataAccessWrapper::drop");
         unsafe {
             ((*(self.vtable)).drop)(self.data);
         }
@@ -73,12 +73,13 @@ impl Drop for DataAccessWrapper {
 #[async_trait]
 impl DataAccess for DataAccessWrapper {
     async fn get_data(&self, key: &str) -> Result<Box<dyn DataHolder>, Box<dyn Error>> {
-        eprintln!("DataAccessWrapper::get_data");
+        eprintln!("+++ [R] DataAccessWrapper::get_data");
         let s = CString::new(key).expect("CString::new failed");
         // pin the C string, to prevent the compiler from moving the data
         let pin = Box::into_pin(s.into_boxed_c_str());
         unsafe {
             let sp = pin.as_ptr();
+            eprintln!("+++ [R] getting data");
             let data_holder = ((*(self.vtable)).get_data)(self.data, sp).await;
             Ok(Box::new(DataWrapper { data_holder }))
         }
@@ -95,7 +96,7 @@ pub unsafe extern "C" fn mylib_alloc(
     data_access: *mut FfiDataAccess,
     data_access_vtable: *const FfiDataAccessVTable,
 ) -> *mut FfiLib {
-    eprintln!("mylib_alloc");
+    eprintln!("+++ [R] mylib_alloc");
     let data_access_wrapper = DataAccessWrapper {
         data: data_access,
         vtable: data_access_vtable,
@@ -109,7 +110,7 @@ pub unsafe extern "C" fn mylib_alloc(
 
 #[no_mangle]
 pub unsafe extern "C" fn mylib_should_run(ffi_lib: *mut FfiLib, postcode: u32) -> FfiFuture<bool> {
-    eprintln!("mylib_should_run");
+    eprintln!("+++ [R] mylib_should_run");
     let lib = &(*ffi_lib).instance;
     // TODO: return proper error
     let postcode = Postcode::new(postcode).unwrap();
@@ -124,6 +125,6 @@ pub unsafe extern "C" fn mylib_should_run(ffi_lib: *mut FfiLib, postcode: u32) -
 
 #[no_mangle]
 pub unsafe extern "C" fn mylib_free(lib: *mut FfiLib) {
-    eprintln!("mylib_free");
+    eprintln!("+++ [R] mylib_free");
     drop(Box::from_raw(lib));
 }

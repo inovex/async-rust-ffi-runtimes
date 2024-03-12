@@ -63,9 +63,9 @@ Lib::~Lib() {
     }
 }
 
-asyncrt::Future<bool> Lib::should_run(std::uint32_t postcode) {
+asyncrt::RustFuture<bool> Lib::should_run(std::uint32_t postcode) {
     auto ffi_future = ::mylib_should_run(m_mylib, postcode);
-    return asyncrt::Future<bool>{std::move(ffi_future)};
+    return asyncrt::RustFuture<bool>{std::move(ffi_future)};
 }
 
 }  // namespace mylib

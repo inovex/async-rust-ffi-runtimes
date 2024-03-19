@@ -56,19 +56,21 @@ public:
                 std::cout << "+++ [C] returning poll status READY" << std::endl;
                 return asyncrt::make_poll_status(static_cast<::FfiDataHolder*>(p));
             }
-            // this is free'd by the call to wake()
-            auto const* waker = context->waker->vtable->clone(context->waker);
+            auto waker = std::shared_ptr{
+                asyncrt::make_drop_ptr_from_raw(context->waker->vtable->clone(context->waker))};
             std::cout << "+++ [C] cloned waker " << reinterpret_cast<void const*>(context->waker)
-                      << " as " << reinterpret_cast<void const*>(waker) << std::endl;
+                      << " as " << reinterpret_cast<void const*>(waker.get()) << std::endl;
             future.await([waker]() {
                 // This will cause `future.poll_fn()` to be called again, this time the first
                 // branch will be taken.
                 std::cout << "+++ [C] cpp future await callback       " << " with waker "
-                          << reinterpret_cast<void const*>(waker) << ", vtable "
+                          << reinterpret_cast<void const*>(waker.get()) << ", vtable "
                           << reinterpret_cast<void const*>(waker->vtable) << std::endl;
                 std::cout << "+++ [C] wake function "
                           << reinterpret_cast<void const*>(waker->vtable->wake) << std::endl;
-                waker->vtable->wake(waker);
+                // Waker::wake() would free the instance immediately, which leads to double-free's,
+                // so use Waker::wake_by_ref() instead
+                waker->vtable->wake_by_ref(waker.get());
                 std::cout << "+++ [C] future done" << std::endl;
             });
             std::cout << "+++ [C] returning poll status PENDING" << std::endl;

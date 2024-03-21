@@ -1,4 +1,4 @@
-project('ffitest', 'cpp', default_options: ['cpp_std=c++23'])
+project('cppclient', 'cpp', default_options: ['cpp_std=c++23'])
 
 cppc = meson.get_compiler('cpp')
 
@@ -9,5 +9,5 @@ rslib = declare_dependency(
     include_directories : include_directories('include')
 )
 
-executable('ffitest', ['main.cpp', 'http.cpp', 'mylib.cpp', 'Runtime.cpp'] , dependencies: [boost, openssl, rslib])
+executable('cppclient', ['main.cpp', 'http.cpp', 'mylib.cpp', 'Runtime.cpp'] , dependencies: [boost, openssl, rslib])
 

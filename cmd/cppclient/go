@@ -1,4 +1,0 @@
-#!/bin/sh
-(cd ../../mylibffi; cargo build) || exit 1
-meson compile -C build || exit 1
-exec ./build/ffitest
